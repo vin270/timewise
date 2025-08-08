@@ -7,3 +7,4 @@ venv/
 *.log
 *.zip
 node_modules/
+firebase-adminsdk.json

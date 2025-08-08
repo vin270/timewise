@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TimeWise Login</title>
+
+
+  <h2>Login to TimeWise</h2>
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="signIn()">Sign In</button>
+
+  <hr>
+
+  <h2>Log a Study Session</h2>
+  <button onclick="logSessionToBackend()">Log Session</button>
+
+
+<input type="email" id="signupEmail" placeholder="Signup Email">
+<input type="password" id="signupPassword" placeholder="Signup Password">
+<button onclick="signUp()">Sign Up</button>
+
+  <!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="{{ url_for('static', filename='script.js') }}"></script>
