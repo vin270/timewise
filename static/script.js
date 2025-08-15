@@ -90,35 +90,74 @@ function signOut() {
   });
 }
 
-function logSessionToBackend() {
+let heartbeatTimer = null;
+function startHeartbeat() {
+  if (heartbeatTimer) return;
+  const send = async () => {
+    const token = localStorage.getItem("idToken");
+    if (!token) return;
+    await fetch("/api/heartbeat", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token }
+    });
+  };
+  send(); // immediate
+  heartbeatTimer = setInterval(send, 30000); // every 30s
+}
+
+
+async function logSessionToBackend() {
   if (!canLogSession) {
-    return alert("You need to finish your Pomodoro + break before logging.");
+    alert("You need to finish your Pomodoro + break before logging.");
+    return;
   }
 
   const token = localStorage.getItem("idToken");
   if (!token) return alert("You must be logged in first.");
 
   canLogSession = false;
-  document.getElementById('log-session-button').disabled = true;
+  const btn = document.getElementById('log-session-button');
+  btn.disabled = true;
 
-  fetch("/api/session", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + token
-    },
-    body: JSON.stringify({ duration: 25 })
-  })
-  .then(res => res.json())
-  .then(data => {
+  try {
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify({ duration: 25 })
+    });
+
+    // Read text first so we can show helpful errors even if JSON parse fails
+    const raw = await res.text();
+    let data = {};
+    if (raw) {
+      try { data = JSON.parse(raw); } catch (e) {
+        throw new Error("Bad JSON from server: " + raw);
+      }
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || (res.status + " " + res.statusText));
+    }
+
     alert("Session logged! Points: " + data.points);
     resetTimer();
-    refreshMyPoints();
-    loadLeaderboard();
-  })
-  .catch(err => alert("Failed to log session."));
-}
 
+    // Update all UI bits *now* so user sees the change
+    await refreshMyPoints();
+    await refreshStats();
+    loadLeaderboard();
+
+  } catch (err) {
+    console.error("Failed to log session:", err);
+    alert("Failed to log session: " + err.message);
+  } finally {
+    // Keep button disabled until next full Pomodoro cycle
+    btn.disabled = true;
+  }
+}
 
 function resetTimer() {
   isWorkSession = true;
@@ -130,10 +169,12 @@ function resetTimer() {
 
 function renderLeaderboard(entries) {
   const ul = document.getElementById('leaderboard');
-  ul.innerHTML = entries.map(e =>
-    `<li>${e.rank}. ${e.nickname} — ${e.points} pts</li>`
-  ).join('');
+  ul.innerHTML = entries.map(e => {
+    const status = e.online ? '🟢' : '⚪️';
+    return `<li>${e.rank}. ${status} ${e.nickname} — ${e.points} pts</li>`;
+  }).join('');
 }
+
 
 function loadLeaderboard() {
   fetch("/api/leaderboard")
@@ -151,9 +192,40 @@ function refreshMyPoints() {
       document.getElementById("user-points").textContent = "My Points : " + d.points;
       document.getElementById("user-nickname").textContent = "My Nickname : " + d.nickname;
       document.getElementById("user-info").style.display = "flex";
+      document.getElementById("user-streak").textContent = `Streak: ${s.current_streak} day(s)`;
+      document.getElementById("user-online").textContent = s.online ? "Online ✅" : "Offline ⏸️";
+      document.getElementById("user-last-session").textContent = s.last_session_utc
+      ? `Last session: ${new Date(s.last_session_utc).toLocaleString()}`
+      : "Last session: —";
     });
 }
 
+async function refreshStats() {
+  const token = localStorage.getItem("idToken");
+  if (!token) return;
+
+  try {
+    const res = await fetch("/api/stats", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    const s = await res.json();
+
+    // Safely update UI (if the spans exist)
+    const streakEl = document.getElementById("user-streak");
+    const onlineEl = document.getElementById("user-online");
+    const lastEl   = document.getElementById("user-last-session");
+
+    if (streakEl) streakEl.textContent = `Streak: ${s.current_streak} day(s)`;
+    if (onlineEl) onlineEl.textContent = s.online ? "Online ✅" : "Offline ⏸️";
+    if (lastEl) {
+      lastEl.textContent = s.last_session_utc
+        ? `Last session: ${new Date(s.last_session_utc).toLocaleString()}`
+        : "Last session: —";
+    }
+  } catch (e) {
+    console.warn("refreshStats failed:", e);
+  }
+}
 
 let meLoaded = false;
 
@@ -170,6 +242,7 @@ window.onload = () => {
       localStorage.setItem("idToken", token);
       document.getElementById("auth-controls").style.display = "none";
       document.getElementById("user-info").style.display = "flex";
+      startHeartbeat();
 
       return fetch("/api/me", {
         headers: { "Authorization": "Bearer " + token }
@@ -207,6 +280,11 @@ window.onload = () => {
       if (!window._lbIntervalSet) {
         window._lbIntervalSet = true;
         setInterval(loadLeaderboard, 15000);
+      }
+      await refreshStats();
+      if (!window._statsIntervalSet) {
+        window._statsIntervalSet = true;
+        setInterval(refreshStats, 30000);
       }
     })
     .catch(err => console.error(err));

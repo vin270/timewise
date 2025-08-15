@@ -15,11 +15,14 @@
       <input type="password" id="signupPassword" placeholder="Signup Password">
       <button onclick="signUp()">Sign Up</button>
     </div>
-    <div id="user-info">
-    <span id="user-nickname">Nickname: </span>
-    <span id="user-points">My Points: </span>
-    <button onclick="signOut()">Sign Out</button>
-  </div>
+    <div id="user-info" style="display:none; gap: 12px;">
+      <span id="user-nickname">Nickname: —</span>
+      <span id="user-points">My Points: 0</span>
+      <span id="user-streak">Streak: 0 day(s)</span>
+      <span id="user-online">Offline ⏸️</span>
+      <span id="user-last-session">Last session: —</span>
+      <button onclick="signOut()">Sign Out</button>
+    </div>
   </header>
 
   <!-- App title -->
