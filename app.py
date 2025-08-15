@@ -4,9 +4,12 @@ from dotenv import load_dotenv
 from datetime import datetime, timezone
 import os
 
+
 from db import db
 from models import UserModel, Session
 from firebase_init import auth
+
+from sqlalchemy.exc import IntegrityError
 
 # Load environment variables
 load_dotenv()
@@ -31,10 +34,55 @@ def home():
 def test():
     return {"message": "Flask is working!"}
 
+
+def get_or_create_user(uid: str) -> UserModel:
+    user = UserModel.query.filter_by(firebase_uid=uid).first()
+    if user:
+        return user
+    user = UserModel(firebase_uid=uid, points=0, nickname=None)
+    db.session.add(user)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        user = UserModel.query.filter_by(firebase_uid=uid).first()
+    return user
+
 @app.route('/api/session', methods=['POST'])
 def log_session():
     auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing or invalid token'}), 401
 
+    token = auth_header.split(" ")[1]
+    try:
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token['uid']
+    except Exception as e:
+        print("Token verification error:", e)
+        return jsonify({'error': 'Invalid token'}), 401
+
+    # To ensure user exists 
+    user = UserModel.query.filter_by(firebase_uid=uid).first()
+    if not user:
+        user = get_or_create_user(uid)
+
+    new_session = Session(
+        user_id=user.id,
+        timestamp=datetime.now(timezone.utc),
+        duration=25 
+    )
+    user.points += 1
+    db.session.add(new_session)
+    db.session.commit()
+
+    return jsonify({'message': 'Session logged!', 'points': user.points})
+
+
+
+@app.route('/api/setnickname', methods=['POST'])
+def setnickname():
+    auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith("Bearer "):
         return jsonify({'error': 'Missing or invalid token'}), 401
 
@@ -47,30 +95,61 @@ def log_session():
         print("Token verification error:", e)
         return jsonify({'error': 'Invalid token'}), 401
 
-    # Look for existing user
+    data = request.get_json()
+    nickname = data.get('nickname', '').strip()
+
+    if not nickname:
+        return jsonify({'error': 'Missing nickname'}), 400
+
     user = UserModel.query.filter_by(firebase_uid=uid).first()
-
     if not user:
-        try:
-            user = UserModel(firebase_uid=uid, points=0)
-            db.session.add(user)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            print("Error inserting user:", e)
-            return jsonify({'error': 'User creation failed'}), 500
+        return jsonify({'error': 'User not found'}), 404
 
-    # Create session
-    new_session = Session(
-        user_id=user.id,
-        timestamp=datetime.now(timezone.utc),
-        duration=25
-    )
-    user.points += 1
-    db.session.add(new_session)
+    user.nickname = nickname
     db.session.commit()
 
-    return jsonify({'message': 'Session logged!', 'points': user.points})
+    return jsonify({'message': 'Nickname updated', 'nickname': nickname})
+
+
+@app.route('/api/me', methods=['GET'])
+def get_me():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({'error': 'Missing or invalid token'}), 401
+
+    token = auth_header.replace("Bearer ", "")
+
+    try:
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token['uid']
+    except Exception as e:
+        print("Token verification error:", e)
+        return jsonify({'error': 'Invalid token'}), 401
+
+    user = UserModel.query.filter_by(firebase_uid=uid).first()
+    if not user:
+        user = get_or_create_user(uid)
+        return jsonify({'nickname': user.nickname, 'points': user.points})
+
+    return jsonify({'nickname': user.nickname, 'points': user.points})
+
+@app.route('/api/leaderboard', methods=['GET'])
+def leaderboard():
+    top_users = UserModel.query \
+        .filter(UserModel.nickname.isnot(None)) \
+        .order_by(UserModel.points.desc()) \
+        .limit(10) \
+        .all()
+
+    data = []
+    for rank, u in enumerate(top_users, start=1):
+        data.append({
+            'rank':     rank,
+            'nickname': u.nickname,
+            'points':   u.points
+        })
+
+    return jsonify(data)
 
 
 if __name__ == "__main__":

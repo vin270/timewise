@@ -1,0 +1,121 @@
+/* --- Page & fonts --- */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #E0BBF5;
+  color: #2C0D3B;
+}
+
+/* --- Header (fully centered) --- */
+header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: #F0DDFF;
+  padding: 10px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  z-index: 10;
+}
+
+#auth-controls, #user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#auth-controls input,
+#auth-controls button,
+#user-info button {
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border: 1px solid #C39BD3;
+  border-radius: 4px;
+}
+
+#auth-controls button,
+#user-info button {
+  background: #7D3C98;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+/* hide user-info until logged in */
+#user-info { display: none; }
+
+/* --- App title below header --- */
+#app-title {
+  margin-top: 70px;  /* push below header */
+  text-align: center;
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #4A235A;
+}
+
+/* --- Timer container centers in remaining viewport --- */
+#timer-container {
+  height: calc(100vh - 140px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+#timer-label { font-size: 3rem; margin-bottom: 20px; }
+#timer-display { font-size: 5rem; margin-bottom: 30px; }
+
+/* --- Buttons --- */
+#start-button,
+#log-session-button {
+  font-size: 1.2rem;
+  padding: 12px 24px;
+  margin: 5px;
+  border: none;
+  border-radius: 6px;
+  background: #7D3C98;
+  color: #fff;
+  cursor: pointer;
+}
+
+#start-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* hide log-session until JS shows it */
+#log-session-button {
+  display: none;
+}
+
+/* --- Leaderboard: initially hidden --- */
+.leaderboard-container {
+  display: none;
+  background: #fff;
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 80px 20px;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.leaderboard-container h2 {
+  font-size: 2rem;
+  margin-bottom: 15px;
+  color: #4A235A;
+}
+
+#leaderboard {
+  list-style: none;
+  padding: 0;
+}
+
+#leaderboard li {
+  font-size: 1.1rem;
+  padding: 8px 0;
+  border-bottom: 1px solid #EEE;
+}

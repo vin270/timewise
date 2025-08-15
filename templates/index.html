@@ -2,28 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>TimeWise Login</title>
+  <title>TimeWise Pomodoro</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <div id="auth-controls">
+      <input type="email" id="email" placeholder="Email">
+      <input type="password" id="password" placeholder="Password">
+      <button onclick="signIn()">Sign In</button>
+      <input type="email" id="signupEmail" placeholder="Signup Email">
+      <input type="password" id="signupPassword" placeholder="Signup Password">
+      <button onclick="signUp()">Sign Up</button>
+    </div>
+    <div id="user-info">
+    <span id="user-nickname">Nickname: </span>
+    <span id="user-points">My Points: </span>
+    <button onclick="signOut()">Sign Out</button>
+  </div>
+  </header>
 
+  <!-- App title -->
+  <div id="app-title">TimeWise</div>
 
-  <h2>Login to TimeWise</h2>
-  <input type="email" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Password">
-  <button onclick="signIn()">Sign In</button>
+  <!-- Timer full-screen viewport -->
+  <main id="timer-container">
+    <h1 id="timer-label">Pomodoro Work Session</h1>
+    <div id="timer-display">25:00</div>
+    <button id="start-button" onclick="startPomodoro()">Start</button>
+    <button id="log-session-button" onclick="logSessionToBackend()">Log Session</button>
+  </main>
 
-  <hr>
+  <!-- Leaderboard hidden until login -->
+  <section id="leaderboard-container" style="display: none; text-align: center; margin-top: 2rem;">
+    <h2>Leaderboard</h2>
+    <ul id="leaderboard"></ul>
+  </section>
 
-  <h2>Log a Study Session</h2>
-  <button onclick="logSessionToBackend()">Log Session</button>
-
-
-<input type="email" id="signupEmail" placeholder="Signup Email">
-<input type="password" id="signupPassword" placeholder="Signup Password">
-<button onclick="signUp()">Sign Up</button>
-
-  <!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-
-
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
