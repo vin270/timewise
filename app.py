@@ -153,43 +153,48 @@ def leaderboard():
         })
     return jsonify(data)
 
+
 @app.route('/api/heartbeat', methods=['POST'])
 def heartbeat():
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return jsonify({'error': 'Missing or invalid token'}), 401
+
+    token = auth_header.split(' ', 1)[1]
     try:
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return jsonify({'error': 'Missing or invalid token'}), 401
-
-        token = auth_header.split(' ', 1)[1]
-        try:
-            uid = auth.verify_id_token(token)['uid']
-        except Exception as e:
-            print("Token verification error (heartbeat):", e)
-            return jsonify({'error': 'Invalid token'}), 401
-
-        # ensure user exists (race-safe)
-        user = UserModel.query.filter_by(firebase_uid=uid).first()
-        if not user:
-            try:
-                user = UserModel(firebase_uid=uid, points=0)
-                db.session.add(user)
-                db.session.commit()
-            except IntegrityError:
-                db.session.rollback()
-                user = UserModel.query.filter_by(firebase_uid=uid).first()
-
-        # update presence
-        user.last_seen = datetime.now(timezone.utc)
-        db.session.commit()
-
-        return jsonify({'ok': True, 'last_seen_utc': user.last_seen.isoformat()})
+        uid = auth.verify_id_token(token)['uid']
     except Exception as e:
-        db.session.rollback()
-        print("Heartbeat handler error:", e)
-        return jsonify({'error': 'Internal server error'}), 500
+        print("Token verification error (heartbeat):", e)
+        return jsonify({'error': 'Invalid token'}), 401
+
+    user = UserModel.query.filter_by(firebase_uid=uid).first()
+    if not user:
+        try:
+            user = UserModel(firebase_uid=uid, points=0)
+            db.session.add(user)
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            user = UserModel.query.filter_by(firebase_uid=uid).first()
+
+    data = request.get_json(silent=True) or {}
+    going_offline = (
+        str(request.args.get('offline', '0')).lower() in ('1', 'true', 'yes')
+        or data.get('online') is False
+    )
+
+    if going_offline:
+        user.last_seen = datetime.now(timezone.utc) - timedelta(seconds=ONLINE_WINDOW_SEC * 10)
+        online = False
+    else:
+        user.last_seen = datetime.now(timezone.utc)
+        online = True
+
+    db.session.commit()
+    return jsonify({'ok': True, 'online': online, 'last_seen_utc': user.last_seen.isoformat()})
+
 
 def compute_current_streak(user_id: int) -> int:
-    # fetch session dates (UTC) in descending order
     rows = (
         db.session.query(func.date(Session.timestamp))
         .filter(Session.user_id == user_id)
@@ -205,7 +210,6 @@ def compute_current_streak(user_id: int) -> int:
     if start not in unique_days:
         return 0
 
-    # walk backward day-by-day
     streak = 0
     d = start
     days_set = set(unique_days)
@@ -231,7 +235,6 @@ def stats():
     if not user:
         user = get_or_create_user(uid)
 
-    # totals
     total_sessions = Session.query.filter_by(user_id=user.id).count()
     last_session = (
         Session.query.filter_by(user_id=user.id)
@@ -239,8 +242,6 @@ def stats():
         .first()
     )
     last_session_iso = last_session.timestamp.isoformat() if last_session else None
-
-    # online = heartbeat in last 90s
     now = datetime.now(timezone.utc)
     online = bool(user.last_seen and (now - user.last_seen).total_seconds() < 90)
 

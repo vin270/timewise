@@ -13,7 +13,7 @@ const auth = firebase.auth();
 let isWorkSession = true;
 let canLogSession = false;
 let timer;
-let secondsLeft = 10; // 25 min for testing
+let secondsLeft = 1500; // 25 min for testing
 
 function updateTimerDisplay() {
   const minutes = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
@@ -33,7 +33,7 @@ function startPomodoro() {
 
       if (isWorkSession) {
         isWorkSession = false;
-        secondsLeft = 10; // 5 min break for testing
+        secondsLeft = 300; // 5 min break for testing
         document.getElementById('timer-label').textContent = 'Break Time';
         startPomodoro();
       } else {
@@ -81,14 +81,27 @@ function signUp() {
     .catch(error => alert("Signup failed: " + error.message));
 }
 
-// Sign out
-function signOut() {
-  auth.signOut().then(() => {
-    localStorage.removeItem("idToken");
-    localStorage.removeItem("nickname");
-    location.reload();
-  });
+async function signOut() {
+  const token = localStorage.getItem("idToken");
+  try {
+    if (token) {
+      await fetch("/api/heartbeat?offline=1", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + token }
+      });
+    }
+  } catch (e) {
+    console.warn("offline heartbeat failed:", e);
+  }
+
+  // stop local timers
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+
+  await auth.signOut();
+  localStorage.clear();
+  location.reload();
 }
+
 
 let heartbeatTimer = null;
 function startHeartbeat() {
@@ -101,7 +114,7 @@ function startHeartbeat() {
       headers: { "Authorization": "Bearer " + token }
     });
   };
-  send(); // immediate
+  send(); 
   heartbeatTimer = setInterval(send, 30000); // every 30s
 }
 
@@ -129,7 +142,6 @@ async function logSessionToBackend() {
       body: JSON.stringify({ duration: 25 })
     });
 
-    // Read text first so we can show helpful errors even if JSON parse fails
     const raw = await res.text();
     let data = {};
     if (raw) {
@@ -145,7 +157,6 @@ async function logSessionToBackend() {
     alert("Session logged! Points: " + data.points);
     resetTimer();
 
-    // Update all UI bits *now* so user sees the change
     await refreshMyPoints();
     await refreshStats();
     loadLeaderboard();
@@ -154,14 +165,13 @@ async function logSessionToBackend() {
     console.error("Failed to log session:", err);
     alert("Failed to log session: " + err.message);
   } finally {
-    // Keep button disabled until next full Pomodoro cycle
     btn.disabled = true;
   }
 }
 
 function resetTimer() {
   isWorkSession = true;
-  secondsLeft = 60;
+  secondsLeft = 1500;
   updateTimerDisplay();
   document.getElementById('timer-label').textContent = 'Work Session';
   document.getElementById('start-button').disabled = false;
@@ -209,8 +219,6 @@ async function refreshStats() {
       headers: { "Authorization": "Bearer " + token }
     });
     const s = await res.json();
-
-    // Safely update UI (if the spans exist)
     const streakEl = document.getElementById("user-streak");
     const onlineEl = document.getElementById("user-online");
     const lastEl   = document.getElementById("user-last-session");
