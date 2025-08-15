@@ -13,7 +13,7 @@ const auth = firebase.auth();
 let isWorkSession = true;
 let canLogSession = false;
 let timer;
-let secondsLeft = 5; // 25 min for testing
+let secondsLeft = 1500; // 25 min for testing
 
 function updateTimerDisplay() {
   const minutes = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
@@ -33,7 +33,7 @@ function startPomodoro() {
 
       if (isWorkSession) {
         isWorkSession = false;
-        secondsLeft = 5; // 5 min break for testing
+        secondsLeft = 300; // 5 min break for testing
         document.getElementById('timer-label').textContent = 'Break Time';
         startPomodoro();
       } else {
